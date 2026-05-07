@@ -9,6 +9,7 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.kubernetes.config_flow import _cluster_unique_id, _validate_kubeconfig
 from custom_components.kubernetes.const import (
     CONF_KUBECONFIG,
     CONF_LABEL_SELECTOR,
@@ -145,3 +146,106 @@ async def test_user_step_shows_form_without_input(hass):
     assert result["type"] is FlowResultType.FORM
     assert result["step_id"] == "user"
     assert result["errors"] == {}
+
+
+@pytest.mark.asyncio
+async def test_options_flow_updates_options(hass, mock_k8s_client):
+    """Test options flow updates config entry options."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_KUBECONFIG: MOCK_KUBECONFIG},
+        unique_id="abc123",
+        options={
+            CONF_NAMESPACES: "default",
+            CONF_LABEL_SELECTOR: DEFAULT_LABEL_SELECTOR,
+            CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAMESPACES: "kube-system,monitoring",
+            CONF_LABEL_SELECTOR: "app=test",
+            CONF_SCAN_INTERVAL: 60,
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_NAMESPACES] == "kube-system,monitoring"
+    assert entry.options[CONF_LABEL_SELECTOR] == "app=test"
+    assert entry.options[CONF_SCAN_INTERVAL] == 60
+
+
+def test_validate_kubeconfig_valid():
+    """Test valid kubeconfig passes validation."""
+    config, error = _validate_kubeconfig(MOCK_KUBECONFIG)
+    assert error is None
+    assert isinstance(config, dict)
+    assert "clusters" in config
+
+
+def test_validate_kubeconfig_invalid_yaml():
+    """Test invalid YAML returns error."""
+    _, error = _validate_kubeconfig("not: valid: yaml: [")
+    assert error == "invalid_kubeconfig"
+
+
+def test_validate_kubeconfig_not_dict():
+    """Test non-dict YAML returns error."""
+    _, error = _validate_kubeconfig("just a string")
+    assert error == "invalid_kubeconfig"
+
+
+def test_validate_kubeconfig_file_references_in_cluster():
+    """Test file path references in clusters are rejected."""
+    kubeconfig = """
+apiVersion: v1
+clusters:
+- cluster:
+    server: https://127.0.0.1:6443
+    certificate-authority: /path/to/ca.crt
+  name: test
+contexts: []
+users: []
+"""
+    _, error = _validate_kubeconfig(kubeconfig)
+    assert error == "file_references"
+
+
+def test_validate_kubeconfig_file_references_in_users():
+    """Test file path references in users are rejected."""
+    kubeconfig = """
+apiVersion: v1
+clusters: []
+contexts: []
+users:
+- name: test
+  user:
+    client-certificate: /path/to/cert.pem
+"""
+    _, error = _validate_kubeconfig(kubeconfig)
+    assert error == "file_references"
+
+
+def test_cluster_unique_id():
+    """Test unique ID is derived from server URL."""
+    config = {"clusters": [{"cluster": {"server": "https://127.0.0.1:6443"}}]}
+    uid = _cluster_unique_id(config)
+    assert isinstance(uid, str)
+    assert len(uid) == 12
+
+
+def test_cluster_unique_id_no_clusters():
+    """Test unique ID with empty clusters falls back to unknown."""
+    uid1 = _cluster_unique_id({"clusters": []})
+    uid2 = _cluster_unique_id({})
+    assert uid1 == uid2
