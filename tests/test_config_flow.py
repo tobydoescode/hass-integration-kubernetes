@@ -14,6 +14,7 @@ from custom_components.kubernetes.const import (
     CONF_KUBECONFIG,
     CONF_LABEL_SELECTOR,
     CONF_NAMESPACES,
+    CONF_NODE_MONITORING,
     CONF_SCAN_INTERVAL,
     DEFAULT_LABEL_SELECTOR,
     DEFAULT_SCAN_INTERVAL,
@@ -249,3 +250,37 @@ def test_cluster_unique_id_no_clusters():
     uid1 = _cluster_unique_id({"clusters": []})
     uid2 = _cluster_unique_id({})
     assert uid1 == uid2
+
+
+@pytest.mark.asyncio
+async def test_options_flow_with_node_monitoring(hass, mock_k8s_client):
+    """Test options flow includes node monitoring toggle."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={CONF_KUBECONFIG: MOCK_KUBECONFIG},
+        unique_id="abc123",
+        options={
+            CONF_NAMESPACES: "default",
+            CONF_LABEL_SELECTOR: DEFAULT_LABEL_SELECTOR,
+            CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
+            CONF_NODE_MONITORING: False,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_NAMESPACES: "default",
+            CONF_LABEL_SELECTOR: DEFAULT_LABEL_SELECTOR,
+            CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
+            CONF_NODE_MONITORING: True,
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options[CONF_NODE_MONITORING] is True

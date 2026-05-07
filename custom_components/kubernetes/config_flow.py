@@ -16,6 +16,7 @@ from .const import (
     CONF_KUBECONFIG,
     CONF_LABEL_SELECTOR,
     CONF_NAMESPACES,
+    CONF_NODE_MONITORING,
     CONF_SCAN_INTERVAL,
     DEFAULT_LABEL_SELECTOR,
     DEFAULT_SCAN_INTERVAL,
@@ -39,6 +40,7 @@ STEP_OPTIONS_SCHEMA = vol.Schema(
         vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): vol.All(
             vol.Coerce(int), vol.Range(min=10, max=600)
         ),
+        vol.Optional(CONF_NODE_MONITORING, default=False): bool,
     }
 )
 
@@ -100,7 +102,7 @@ class KubernetesConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Kubernetes."""
 
     VERSION = 1
-    MINOR_VERSION = 1
+    MINOR_VERSION = 2
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -152,6 +154,7 @@ class KubernetesConfigFlow(ConfigFlow, domain=DOMAIN):
                         CONF_LABEL_SELECTOR, DEFAULT_LABEL_SELECTOR
                     ),
                     CONF_SCAN_INTERVAL: user_input.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                    CONF_NODE_MONITORING: user_input.get(CONF_NODE_MONITORING, False),
                 },
             )
 
@@ -194,6 +197,10 @@ class KubernetesOptionsFlow(OptionsFlow):
                     CONF_SCAN_INTERVAL,
                     default=current.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
                 ): vol.All(vol.Coerce(int), vol.Range(min=10, max=600)),
+                vol.Optional(
+                    CONF_NODE_MONITORING,
+                    default=current.get(CONF_NODE_MONITORING, False),
+                ): bool,
             }
         )
 
