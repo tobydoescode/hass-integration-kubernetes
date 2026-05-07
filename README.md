@@ -12,6 +12,13 @@ Each labeled Deployment or StatefulSet becomes an HA device with:
 - **Button** — trigger a rollout restart
 - **Number** — set the replica count (0–50)
 
+### Node monitoring (opt-in)
+
+When enabled in **Configure → Enable node monitoring**:
+
+- **Cluster device** with total nodes and ready nodes sensors
+- **Per-node devices** with a Ready binary sensor for each node
+
 ## Installation
 
 ### HACS (recommended)
@@ -93,9 +100,11 @@ The `nodes` permission is only required when node monitoring is enabled.
 | Command | Description |
 |---|---|
 | `task sync` | Install Python dependencies |
+| `task pre-commit:install` | Install git pre-commit hooks |
 | `task lint` | Run ruff linter and format check |
 | `task lint:fix` | Auto-fix lint and formatting issues |
 | `task test` | Run pytest |
+| `task test:coverage` | Run tests with coverage report |
 | `task dev` | Start Home Assistant in Docker |
 | `task dev:stop` | Stop Home Assistant |
 | `task dev:restart` | Restart Home Assistant (after code changes) |

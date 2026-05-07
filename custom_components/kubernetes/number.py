@@ -8,9 +8,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from propcache.api import cached_property
 
-from .const import DOMAIN
+from .const import DOMAIN, RESOURCE_TYPE_DEPLOYMENT, RESOURCE_TYPE_STATEFULSET
 from .coordinator import KubernetesCoordinator, ResourceKey
 from .entity import KubernetesEntity
+
+WORKLOAD_TYPES = {RESOURCE_TYPE_DEPLOYMENT, RESOURCE_TYPE_STATEFULSET}
 
 
 async def async_setup_entry(
@@ -21,7 +23,11 @@ async def async_setup_entry(
     """Set up Kubernetes number entities from a config entry."""
     coordinator: KubernetesCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities = [KubernetesReplicasNumber(coordinator, key) for key in coordinator.data]
+    entities = [
+        KubernetesReplicasNumber(coordinator, key)
+        for key in coordinator.data
+        if key[1] in WORKLOAD_TYPES
+    ]
     async_add_entities(entities)
 
 
