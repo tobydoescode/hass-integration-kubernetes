@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import UpdateFailed
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kubernetes.const import (
+    CONF_NODE_MONITORING,
     DEFAULT_LABEL_SELECTOR,
     DOMAIN,
 )
@@ -131,3 +132,28 @@ async def test_repair_cleared_on_recovery(hass, mock_k8s_client):
     await coordinator._async_update_data()
 
     assert issue_registry.async_get_issue(DOMAIN, f"cluster_unreachable_{entry.entry_id}") is None
+
+
+@pytest.mark.asyncio
+async def test_migrate_v1_1_to_v1_2_adds_node_monitoring(hass, mock_k8s_client):
+    """Test migration adds node_monitoring=False to existing entries."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Kubernetes",
+        data=MOCK_CONFIG_DATA,
+        unique_id="abc123",
+        options={
+            "namespaces": "default",
+            "label_selector": "homeassistant.io/managed=true",
+            "scan_interval": 30,
+        },
+        version=1,
+        minor_version=1,
+    )
+    entry.add_to_hass(hass)
+
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert entry.minor_version == 2
+    assert entry.options[CONF_NODE_MONITORING] is False

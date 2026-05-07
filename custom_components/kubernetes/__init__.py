@@ -8,7 +8,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import CONF_NODE_MONITORING, DOMAIN
 from .coordinator import KubernetesCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -18,9 +18,14 @@ PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.NUMBER, Platform.
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate config entry to current version."""
-    _LOGGER.debug(
-        "Migrating Kubernetes config entry from %s.%s", entry.version, entry.minor_version
-    )
+    if entry.version == 1 and entry.minor_version < 2:
+        _LOGGER.debug("Migrating Kubernetes config entry from 1.%s to 1.2", entry.minor_version)
+        new_options = {**entry.options}
+        if CONF_NODE_MONITORING not in new_options:
+            new_options[CONF_NODE_MONITORING] = False
+        hass.config_entries.async_update_entry(
+            entry, options=new_options, minor_version=2, version=1
+        )
     return True
 
 
