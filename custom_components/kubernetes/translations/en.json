@@ -13,7 +13,8 @@
         "data": {
           "namespaces": "Namespaces (comma-separated, blank for all)",
           "label_selector": "Label selector for resource discovery",
-          "scan_interval": "Polling interval (seconds)"
+          "scan_interval": "Polling interval (seconds)",
+          "node_monitoring": "Enable node monitoring"
         }
       }
     },
@@ -33,7 +34,8 @@
         "data": {
           "namespaces": "Namespaces (comma-separated, blank for all)",
           "label_selector": "Label selector for resource discovery",
-          "scan_interval": "Polling interval (seconds)"
+          "scan_interval": "Polling interval (seconds)",
+          "node_monitoring": "Enable node monitoring"
         }
       }
     }
