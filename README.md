@@ -72,7 +72,12 @@ rules:
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list"]
 ```
+
+The `nodes` permission is only required when node monitoring is enabled.
 
 ## Development
 
