@@ -69,6 +69,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["deployments", "deployments/scale", "statefulsets", "statefulsets/scale"]
     verbs: ["get", "list", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
 ```
 
 ## Development

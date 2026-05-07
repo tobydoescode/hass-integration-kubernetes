@@ -114,6 +114,7 @@ def mock_k8s_client() -> Generator[MagicMock]:
     mock_api_client = MagicMock()
     mock_apps_v1 = MagicMock()
     mock_core_v1 = MagicMock()
+    mock_apps_v1.core_v1 = mock_core_v1
 
     with (
         patch(
@@ -155,7 +156,7 @@ def mock_k8s_client() -> Generator[MagicMock]:
         db_pods = MagicMock()
         db_pods.items = [_make_pod([0]), _make_pod([0])]
 
-        def _list_pods(namespace, label_selector=""):
+        def _list_pods(namespace, label_selector="", **kwargs):
             if "app=web" in label_selector:
                 return web_pods
             if "app=db" in label_selector:

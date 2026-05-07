@@ -19,6 +19,7 @@ from .const import (
     DEFAULT_LABEL_SELECTOR,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
+    KUBERNETES_REQUEST_TIMEOUT,
     RESOURCE_TYPE_DEPLOYMENT,
     RESOURCE_TYPE_STATEFULSET,
 )
@@ -92,19 +93,33 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         # Fetch Deployments
         if namespaces:
             for ns in namespaces:
-                deps = self._apps_v1.list_namespaced_deployment(ns, label_selector=label_selector)
+                deps = self._apps_v1.list_namespaced_deployment(
+                    ns,
+                    label_selector=label_selector,
+                    _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+                )
                 self._process_deployments(deps.items, data)
         else:
-            deps = self._apps_v1.list_deployment_for_all_namespaces(label_selector=label_selector)
+            deps = self._apps_v1.list_deployment_for_all_namespaces(
+                label_selector=label_selector,
+                _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+            )
             self._process_deployments(deps.items, data)
 
         # Fetch StatefulSets
         if namespaces:
             for ns in namespaces:
-                sts = self._apps_v1.list_namespaced_stateful_set(ns, label_selector=label_selector)
+                sts = self._apps_v1.list_namespaced_stateful_set(
+                    ns,
+                    label_selector=label_selector,
+                    _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+                )
                 self._process_statefulsets(sts.items, data)
         else:
-            sts = self._apps_v1.list_stateful_set_for_all_namespaces(label_selector=label_selector)
+            sts = self._apps_v1.list_stateful_set_for_all_namespaces(
+                label_selector=label_selector,
+                _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+            )
             self._process_statefulsets(sts.items, data)
 
         # Fetch pod restart counts for each resource
@@ -123,7 +138,23 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 continue
 
             label_selector = ",".join(f"{k}={v}" for k, v in match_labels.items())
-            pods = self._core_v1.list_namespaced_pod(namespace, label_selector=label_selector)
+            try:
+                pods = self._core_v1.list_namespaced_pod(
+                    namespace,
+                    label_selector=label_selector,
+                    _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+                )
+            except Exception as err:
+                _LOGGER.warning(
+                    "Could not fetch pod restart metrics for %s/%s/%s: %s",
+                    namespace,
+                    key[1],
+                    key[2],
+                    err,
+                )
+                resource["pod_restart_count"] = None
+                resource["last_restart_reason"] = None
+                continue
 
             total_restarts = 0
             latest_reason: str | None = None
@@ -205,9 +236,19 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             }
         }
         if kind == RESOURCE_TYPE_DEPLOYMENT:
-            self._apps_v1.patch_namespaced_deployment(name, namespace, body)
+            self._apps_v1.patch_namespaced_deployment(
+                name,
+                namespace,
+                body,
+                _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+            )
         elif kind == RESOURCE_TYPE_STATEFULSET:
-            self._apps_v1.patch_namespaced_stateful_set(name, namespace, body)
+            self._apps_v1.patch_namespaced_stateful_set(
+                name,
+                namespace,
+                body,
+                _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+            )
 
     async def async_set_replicas(self, namespace: str, kind: str, name: str, replicas: int) -> None:
         """Scale a resource to the specified replica count."""
@@ -219,9 +260,19 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._ensure_client()
         body = {"spec": {"replicas": replicas}}
         if kind == RESOURCE_TYPE_DEPLOYMENT:
-            self._apps_v1.patch_namespaced_deployment_scale(name, namespace, body)
+            self._apps_v1.patch_namespaced_deployment_scale(
+                name,
+                namespace,
+                body,
+                _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+            )
         elif kind == RESOURCE_TYPE_STATEFULSET:
-            self._apps_v1.patch_namespaced_stateful_set_scale(name, namespace, body)
+            self._apps_v1.patch_namespaced_stateful_set_scale(
+                name,
+                namespace,
+                body,
+                _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+            )
 
     def close(self) -> None:
         """Close the API client."""

@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kubernetes.const import (
     DOMAIN,
+    KUBERNETES_REQUEST_TIMEOUT,
     RESOURCE_TYPE_DEPLOYMENT,
     RESOURCE_TYPE_STATEFULSET,
 )
@@ -63,6 +64,46 @@ async def test_fetch_data(hass: HomeAssistant, mock_k8s_client: MagicMock) -> No
     assert coordinator.data[sts_key]["last_restart"] is None
     assert coordinator.data[sts_key]["pod_restart_count"] == 0
     assert coordinator.data[sts_key]["last_restart_reason"] is None
+
+
+@pytest.mark.asyncio
+async def test_fetch_data_uses_request_timeouts(
+    hass: HomeAssistant, mock_k8s_client: MagicMock
+) -> None:
+    """Test that Kubernetes API list calls use explicit request timeouts."""
+    entry = _make_entry(hass)
+    coordinator = KubernetesCoordinator(hass, entry)
+
+    await coordinator.async_refresh()
+
+    mock_k8s_client.list_namespaced_deployment.assert_called_once_with(
+        "default",
+        label_selector="homeassistant.io/managed=true",
+        _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+    )
+    mock_k8s_client.list_namespaced_stateful_set.assert_called_once_with(
+        "default",
+        label_selector="homeassistant.io/managed=true",
+        _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+    )
+
+
+@pytest.mark.asyncio
+async def test_fetch_data_degrades_when_pod_restart_counts_fail(
+    hass: HomeAssistant, mock_k8s_client: MagicMock
+) -> None:
+    """Test that pod list failures do not fail the whole coordinator refresh."""
+    mock_k8s_client.core_v1.list_namespaced_pod.side_effect = Exception("pods are forbidden")
+    entry = _make_entry(hass)
+    coordinator = KubernetesCoordinator(hass, entry)
+
+    await coordinator.async_refresh()
+
+    assert coordinator.data is not None
+    dep_key = ("default", RESOURCE_TYPE_DEPLOYMENT, "web")
+    assert coordinator.data[dep_key]["ready_replicas"] == 3
+    assert coordinator.data[dep_key]["pod_restart_count"] is None
+    assert coordinator.data[dep_key]["last_restart_reason"] is None
 
 
 @pytest.mark.asyncio
