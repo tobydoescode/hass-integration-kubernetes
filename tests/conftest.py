@@ -12,6 +12,7 @@ from custom_components.kubernetes.const import (
     CONF_KUBECONFIG,
     CONF_LABEL_SELECTOR,
     CONF_NAMESPACES,
+    CONF_NODE_MONITORING,
     CONF_SCAN_INTERVAL,
     DEFAULT_LABEL_SELECTOR,
     DEFAULT_SCAN_INTERVAL,
@@ -44,6 +45,26 @@ MOCK_OPTIONS = {
     CONF_LABEL_SELECTOR: DEFAULT_LABEL_SELECTOR,
     CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
 }
+MOCK_OPTIONS_WITH_NODES = {
+    CONF_NAMESPACES: "default",
+    CONF_LABEL_SELECTOR: DEFAULT_LABEL_SELECTOR,
+    CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
+    CONF_NODE_MONITORING: True,
+}
+
+
+def _make_node(name: str, ready: bool) -> MagicMock:
+    """Create a mock Node object."""
+    node = MagicMock()
+    node.metadata.name = name
+    ready_condition = MagicMock()
+    ready_condition.type = "Ready"
+    ready_condition.status = "True" if ready else "False"
+    other_condition = MagicMock()
+    other_condition.type = "DiskPressure"
+    other_condition.status = "False"
+    node.status.conditions = [other_condition, ready_condition]
+    return node
 
 
 def _make_container(image: str) -> MagicMock:
@@ -164,5 +185,10 @@ def mock_k8s_client() -> Generator[MagicMock]:
             return MagicMock(items=[])
 
         mock_core_v1.list_namespaced_pod.side_effect = _list_pods
+
+        # Mock node list
+        node_list = MagicMock()
+        node_list.items = [_make_node("node-1", True), _make_node("node-2", True)]
+        mock_core_v1.list_node.return_value = node_list
 
         yield mock_apps_v1

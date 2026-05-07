@@ -6,17 +6,20 @@ from unittest.mock import MagicMock
 
 import pytest
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kubernetes.const import (
     DOMAIN,
     KUBERNETES_REQUEST_TIMEOUT,
+    RESOURCE_TYPE_CLUSTER,
     RESOURCE_TYPE_DEPLOYMENT,
+    RESOURCE_TYPE_NODE,
     RESOURCE_TYPE_STATEFULSET,
 )
 from custom_components.kubernetes.coordinator import KubernetesCoordinator
 
-from .conftest import MOCK_CONFIG_DATA, MOCK_OPTIONS
+from .conftest import MOCK_CONFIG_DATA, MOCK_OPTIONS, MOCK_OPTIONS_WITH_NODES
 
 
 def _make_entry(hass: HomeAssistant) -> MockConfigEntry:
@@ -150,3 +153,102 @@ async def test_set_replicas_statefulset(hass: HomeAssistant, mock_k8s_client: Ma
     await coordinator.async_set_replicas("default", RESOURCE_TYPE_STATEFULSET, "db", 3)
 
     mock_k8s_client.patch_namespaced_stateful_set_scale.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_fetch_data_with_node_monitoring(
+    hass: HomeAssistant, mock_k8s_client: MagicMock
+) -> None:
+    """Test that node monitoring fetches cluster and node data."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=MOCK_CONFIG_DATA,
+        options=MOCK_OPTIONS_WITH_NODES,
+        entry_id="test_entry_123",
+    )
+    entry.add_to_hass(hass)
+    coordinator = KubernetesCoordinator(hass, entry)
+
+    await coordinator.async_refresh()
+
+    assert coordinator.data is not None
+
+    # Cluster summary
+    cluster_key = ("", RESOURCE_TYPE_CLUSTER, "cluster")
+    assert cluster_key in coordinator.data
+    assert coordinator.data[cluster_key]["total_nodes"] == 2
+    assert coordinator.data[cluster_key]["ready_nodes"] == 2
+
+    # Individual nodes
+    node1_key = ("", RESOURCE_TYPE_NODE, "node-1")
+    assert node1_key in coordinator.data
+    assert coordinator.data[node1_key]["ready"] is True
+
+    node2_key = ("", RESOURCE_TYPE_NODE, "node-2")
+    assert node2_key in coordinator.data
+    assert coordinator.data[node2_key]["ready"] is True
+
+
+@pytest.mark.asyncio
+async def test_fetch_data_without_node_monitoring(
+    hass: HomeAssistant, mock_k8s_client: MagicMock
+) -> None:
+    """Test that node data is not fetched when node monitoring is disabled."""
+    entry = _make_entry(hass)
+    coordinator = KubernetesCoordinator(hass, entry)
+
+    await coordinator.async_refresh()
+
+    assert coordinator.data is not None
+
+    cluster_key = ("", RESOURCE_TYPE_CLUSTER, "cluster")
+    assert cluster_key not in coordinator.data
+
+    node_key = ("", RESOURCE_TYPE_NODE, "node-1")
+    assert node_key not in coordinator.data
+
+
+@pytest.fixture
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Enable custom integrations for tests that need full setup."""
+    yield
+
+
+@pytest.mark.asyncio
+async def test_stale_device_cleanup(
+    hass: HomeAssistant,
+    mock_k8s_client: MagicMock,
+    auto_enable_custom_integrations,
+) -> None:
+    """Test that devices are removed when their resources disappear."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=MOCK_CONFIG_DATA,
+        options=MOCK_OPTIONS,
+        entry_id="test_entry_123",
+    )
+    entry.add_to_hass(hass)
+
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Verify "web" device exists
+    dev_reg = dr.async_get(hass)
+    web_device = dev_reg.async_get_device(
+        identifiers={(DOMAIN, "test_entry_123_default/Deployment/web")}
+    )
+    assert web_device is not None
+
+    # Remove the "web" deployment from the mock
+    mock_k8s_client.list_namespaced_deployment.return_value.items = []
+
+    # Refresh coordinator to trigger stale cleanup
+    coordinator: KubernetesCoordinator = hass.data[DOMAIN][entry.entry_id]
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    # Verify "web" device is removed
+    web_device = dev_reg.async_get_device(
+        identifiers={(DOMAIN, "test_entry_123_default/Deployment/web")}
+    )
+    assert web_device is None

@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.issue_registry import (
     IssueSeverity,
     async_create_issue,
@@ -20,12 +21,15 @@ from .const import (
     CONF_KUBECONFIG,
     CONF_LABEL_SELECTOR,
     CONF_NAMESPACES,
+    CONF_NODE_MONITORING,
     CONF_SCAN_INTERVAL,
     DEFAULT_LABEL_SELECTOR,
     DEFAULT_SCAN_INTERVAL,
     DOMAIN,
     KUBERNETES_REQUEST_TIMEOUT,
+    RESOURCE_TYPE_CLUSTER,
     RESOURCE_TYPE_DEPLOYMENT,
+    RESOURCE_TYPE_NODE,
     RESOURCE_TYPE_STATEFULSET,
 )
 
@@ -58,6 +62,7 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._apps_v1 = None
         self._core_v1 = None
         self._consecutive_failures: int = 0
+        self._previous_resource_keys: set[ResourceKey] = set()
 
     def _ensure_client(self) -> None:
         """Create the Kubernetes API client if not already created."""
@@ -82,6 +87,11 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         """Get configured label selector."""
         return self.entry.options.get(CONF_LABEL_SELECTOR, DEFAULT_LABEL_SELECTOR)
 
+    @property
+    def node_monitoring(self) -> bool:
+        """Get whether node monitoring is enabled."""
+        return self.entry.options.get(CONF_NODE_MONITORING, False)
+
     async def _async_update_data(self) -> CoordinatorData:
         """Fetch data from Kubernetes."""
         try:
@@ -91,6 +101,7 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             self._maybe_create_repair()
             raise UpdateFailed(f"Error fetching Kubernetes data: {err}") from err
         self._clear_repair()
+        self._cleanup_stale_devices(set(data.keys()))
         return data
 
     def _maybe_create_repair(self) -> None:
@@ -159,6 +170,10 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
         # Fetch pod restart counts for each resource
         self._fetch_pod_restart_counts(data)
+
+        # Fetch nodes if enabled
+        if self.node_monitoring:
+            self._fetch_nodes(data)
 
         return data
 
@@ -250,6 +265,57 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                 "last_restart": annotations.get("kubectl.kubernetes.io/restartedAt"),
                 "match_labels": match_labels,
             }
+
+    def _fetch_nodes(self, data: CoordinatorData) -> None:
+        """Fetch node status and cluster summary."""
+        assert self._core_v1 is not None
+        node_list = self._core_v1.list_node(
+            _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
+        )
+        total_nodes = 0
+        ready_nodes = 0
+        for node in node_list.items:
+            name: str = node.metadata.name
+            ready = False
+            for condition in node.status.conditions or []:
+                if condition.type == "Ready":
+                    ready = condition.status == "True"
+                    break
+            key: ResourceKey = ("", RESOURCE_TYPE_NODE, name)
+            data[key] = {"ready": ready}
+            total_nodes += 1
+            if ready:
+                ready_nodes += 1
+
+        cluster_key: ResourceKey = ("", RESOURCE_TYPE_CLUSTER, "cluster")
+        data[cluster_key] = {
+            "total_nodes": total_nodes,
+            "ready_nodes": ready_nodes,
+        }
+
+    def _cleanup_stale_devices(self, current_keys: set[ResourceKey]) -> None:
+        """Remove devices for resources that no longer exist."""
+        stale_keys = self._previous_resource_keys - current_keys
+        self._previous_resource_keys = current_keys
+
+        if not stale_keys:
+            return
+
+        dev_reg = dr.async_get(self.hass)
+        entry_id = self.entry.entry_id
+
+        for key in stale_keys:
+            namespace, kind, name = key
+            if kind == RESOURCE_TYPE_CLUSTER:
+                identifier = f"{entry_id}_cluster"
+            elif kind == RESOURCE_TYPE_NODE:
+                identifier = f"{entry_id}_node_{name}"
+            else:
+                identifier = f"{entry_id}_{namespace}/{kind}/{name}"
+
+            device = dev_reg.async_get_device(identifiers={(DOMAIN, identifier)})
+            if device is not None:
+                dev_reg.async_remove_device(device.id)
 
     async def async_rollout_restart(self, namespace: str, kind: str, name: str) -> None:
         """Trigger a rollout restart by patching the pod template annotation."""
