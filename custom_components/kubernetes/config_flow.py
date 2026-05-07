@@ -8,9 +8,8 @@ from typing import Any
 
 import voluptuous as vol
 import yaml
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow
 from homeassistant.core import callback
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 
 from .const import (
@@ -107,7 +106,7 @@ class KubernetesConfigFlow(ConfigFlow, domain=DOMAIN):
         self._config_dict: dict = {}
         self._kubeconfig_text: str = ""
 
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the kubeconfig input step."""
         errors: dict[str, str] = {}
 
@@ -138,7 +137,9 @@ class KubernetesConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_options(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_options(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the options step."""
         if user_input is not None:
             return self.async_create_entry(
@@ -172,7 +173,7 @@ class KubernetesOptionsFlow(OptionsFlow):
         """Initialize options flow."""
         self._config_entry = config_entry
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(data=user_input)

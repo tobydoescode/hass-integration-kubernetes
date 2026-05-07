@@ -28,6 +28,11 @@ tasks:
     cmds:
       - uv run python -m pytest tests/ -v
 
+  test:coverage:
+    desc: Run tests with coverage report
+    cmds:
+      - uv run python -m pytest tests/ --cov=custom_components/kubernetes --cov-report=term-missing --cov-report=html
+
   kind:create:
     desc: Create a Kind cluster for testing
     cmds:

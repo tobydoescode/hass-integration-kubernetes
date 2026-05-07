@@ -6,6 +6,7 @@ from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from propcache.api import cached_property
 
 from .const import DOMAIN
 from .coordinator import KubernetesCoordinator, ResourceKey
@@ -41,7 +42,7 @@ class KubernetesReplicasNumber(KubernetesEntity, NumberEntity):
             f"{self._entry_id}_{self._namespace}_{self._kind}_{self._resource_name}_replicas"
         )
 
-    @property
+    @cached_property
     def native_value(self) -> float | None:
         """Return the current replica count."""
         data = self.resource_data

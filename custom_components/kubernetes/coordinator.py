@@ -86,6 +86,8 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _fetch_data(self) -> CoordinatorData:
         """Fetch deployments and statefulsets (sync, runs in executor)."""
         self._ensure_client()
+        assert self._apps_v1 is not None
+        assert self._core_v1 is not None
         data: CoordinatorData = {}
         namespaces = self.namespaces
         label_selector = self.label_selector
@@ -129,6 +131,7 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
 
     def _fetch_pod_restart_counts(self, data: CoordinatorData) -> None:
         """Fetch pod restart counts and last restart reason for each resource."""
+        assert self._core_v1 is not None
         for key, resource in data.items():
             namespace = key[0]
             match_labels = resource.get("match_labels", {})
@@ -223,6 +226,7 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _rollout_restart(self, namespace: str, kind: str, name: str) -> None:
         """Perform rollout restart (sync, runs in executor)."""
         self._ensure_client()
+        assert self._apps_v1 is not None
         now = datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         body = {
             "spec": {
@@ -258,6 +262,7 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     def _set_replicas(self, namespace: str, kind: str, name: str, replicas: int) -> None:
         """Set replica count (sync, runs in executor)."""
         self._ensure_client()
+        assert self._apps_v1 is not None
         body = {"spec": {"replicas": replicas}}
         if kind == RESOURCE_TYPE_DEPLOYMENT:
             self._apps_v1.patch_namespaced_deployment_scale(

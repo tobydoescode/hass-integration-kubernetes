@@ -8,6 +8,7 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, Sen
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from propcache.api import cached_property
 
 from .const import DOMAIN, RESOURCE_TYPE_DEPLOYMENT
 from .coordinator import KubernetesCoordinator, ResourceKey
@@ -52,7 +53,7 @@ class KubernetesReadyPodsSensor(KubernetesEntity, SensorEntity):
             f"{self._entry_id}_{self._namespace}_{self._kind}_{self._resource_name}_ready"
         )
 
-    @property
+    @cached_property
     def native_value(self) -> int | None:
         """Return the number of ready pods."""
         data = self.resource_data
@@ -76,7 +77,7 @@ class KubernetesDesiredReplicasSensor(KubernetesEntity, SensorEntity):
             f"{self._entry_id}_{self._namespace}_{self._kind}_{self._resource_name}_desired"
         )
 
-    @property
+    @cached_property
     def native_value(self) -> int | None:
         """Return the desired replica count."""
         data = self.resource_data
@@ -100,7 +101,7 @@ class KubernetesAvailablePodsSensor(KubernetesEntity, SensorEntity):
             f"{self._entry_id}_{self._namespace}_{self._kind}_{self._resource_name}_available"
         )
 
-    @property
+    @cached_property
     def native_value(self) -> int | None:
         """Return the number of available pods."""
         data = self.resource_data
@@ -122,7 +123,7 @@ class KubernetesContainerImageSensor(KubernetesEntity, SensorEntity):
             f"{self._entry_id}_{self._namespace}_{self._kind}_{self._resource_name}_image"
         )
 
-    @property
+    @cached_property
     def native_value(self) -> str | None:
         """Return the container image."""
         data = self.resource_data
@@ -145,7 +146,7 @@ class KubernetesLastRestartSensor(KubernetesEntity, SensorEntity):
             f"{self._entry_id}_{self._namespace}_{self._kind}_{self._resource_name}_last_restart"
         )
 
-    @property
+    @cached_property
     def native_value(self) -> datetime | None:
         """Return the last restart timestamp."""
         data = self.resource_data
@@ -172,7 +173,7 @@ class KubernetesPodRestartCountSensor(KubernetesEntity, SensorEntity):
             f"{self._entry_id}_{self._namespace}_{self._kind}_{self._resource_name}_restarts"
         )
 
-    @property
+    @cached_property
     def native_value(self) -> int | None:
         """Return the total pod restart count."""
         data = self.resource_data
@@ -195,7 +196,7 @@ class KubernetesLastRestartReasonSensor(KubernetesEntity, SensorEntity):
             f"_{self._resource_name}_last_restart_reason"
         )
 
-    @property
+    @cached_property
     def native_value(self) -> str | None:
         """Return the last restart reason."""
         data = self.resource_data

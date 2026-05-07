@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from propcache.api import cached_property
 
 from .const import DOMAIN
 from .coordinator import KubernetesCoordinator, ResourceKey
 
+CACHED_PROPS = ("device_info", "resource_data", "available", "native_value", "is_on")
 
-class KubernetesEntity(CoordinatorEntity[KubernetesCoordinator]):
+
+class KubernetesEntity(CoordinatorEntity[KubernetesCoordinator]):  # type: ignore[reportIncompatibleVariableOverride]
     """Base class for Kubernetes entities."""
 
     _attr_has_entity_name = True
@@ -24,11 +30,18 @@ class KubernetesEntity(CoordinatorEntity[KubernetesCoordinator]):
         self._resource_key = resource_key
         self._namespace, self._kind, self._resource_name = resource_key
 
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Invalidate cached properties and write state."""
+        for prop in CACHED_PROPS:
+            vars(self).pop(prop, None)
+        super()._handle_coordinator_update()
+
     @property
     def _entry_id(self) -> str:
         return self.coordinator.entry.entry_id
 
-    @property
+    @cached_property
     def device_info(self) -> DeviceInfo:
         """Return device info for this resource."""
         return DeviceInfo(
@@ -41,14 +54,14 @@ class KubernetesEntity(CoordinatorEntity[KubernetesCoordinator]):
             sw_version=self._namespace,
         )
 
-    @property
-    def resource_data(self) -> dict | None:
+    @cached_property
+    def resource_data(self) -> dict[str, Any] | None:
         """Get the current data for this resource."""
         if self.coordinator.data is None:
             return None
         return self.coordinator.data.get(self._resource_key)
 
-    @property
-    def available(self) -> bool:
+    @cached_property
+    def available(self) -> bool:  # type: ignore[reportIncompatibleMethodOverride]
         """Return True if the resource exists in the latest data."""
         return super().available and self.resource_data is not None

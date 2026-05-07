@@ -9,6 +9,7 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from propcache.api import cached_property
 
 from .const import DOMAIN
 from .coordinator import KubernetesCoordinator, ResourceKey
@@ -44,7 +45,7 @@ class KubernetesRolloutInProgressBinarySensor(KubernetesEntity, BinarySensorEnti
             f"_{self._resource_name}_rollout_in_progress"
         )
 
-    @property
+    @cached_property
     def is_on(self) -> bool | None:
         """Return True if a rollout is in progress."""
         data = self.resource_data

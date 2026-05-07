@@ -27,7 +27,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: "3.14"
+          python-version: "3.13"
 
       - name: Install dependencies
         run: uv sync --extra dev
@@ -37,6 +37,9 @@ jobs:
 
       - name: Check formatting
         run: uv run ruff format --check custom_components/ tests/
+
+      - name: Pyright
+        run: uv run pyright custom_components/kubernetes/
 
       - name: Run tests with coverage
         run: |

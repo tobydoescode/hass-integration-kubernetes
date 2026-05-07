@@ -5,6 +5,12 @@ repos:
       - id: check-added-large-files
         args: ['--maxkb=500']
         exclude: '^uv\.lock$'
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.10
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.24.2
     hooks:
