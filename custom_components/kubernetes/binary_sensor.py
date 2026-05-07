@@ -11,9 +11,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from propcache.api import cached_property
 
-from .const import DOMAIN
+from .const import CONF_NODE_MONITORING, DOMAIN, RESOURCE_TYPE_CLUSTER, RESOURCE_TYPE_NODE
 from .coordinator import KubernetesCoordinator, ResourceKey
 from .entity import KubernetesEntity
+from .node import KubernetesNodeReadyBinarySensor
 
 
 async def async_setup_entry(
@@ -24,9 +25,18 @@ async def async_setup_entry(
     """Set up Kubernetes binary sensors from a config entry."""
     coordinator: KubernetesCoordinator = hass.data[DOMAIN][entry.entry_id]
 
-    entities = [
-        KubernetesRolloutInProgressBinarySensor(coordinator, key) for key in coordinator.data
+    entities: list[BinarySensorEntity] = [
+        KubernetesRolloutInProgressBinarySensor(coordinator, key)
+        for key in coordinator.data
+        if key[1] not in (RESOURCE_TYPE_NODE, RESOURCE_TYPE_CLUSTER)
     ]
+
+    if entry.options.get(CONF_NODE_MONITORING, False):
+        entry_id = entry.entry_id
+        for key in coordinator.data:
+            if key[1] == RESOURCE_TYPE_NODE:
+                entities.append(KubernetesNodeReadyBinarySensor(coordinator, entry_id, key[2]))
+
     async_add_entities(entities)
 
 

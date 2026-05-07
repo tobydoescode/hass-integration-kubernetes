@@ -10,9 +10,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from propcache.api import cached_property
 
-from .const import DOMAIN, RESOURCE_TYPE_DEPLOYMENT
+from .const import (
+    CONF_NODE_MONITORING,
+    DOMAIN,
+    RESOURCE_TYPE_DEPLOYMENT,
+    RESOURCE_TYPE_STATEFULSET,
+)
 from .coordinator import KubernetesCoordinator, ResourceKey
 from .entity import KubernetesEntity
+from .node import KubernetesClusterReadyNodesSensor, KubernetesClusterTotalNodesSensor
 
 
 async def async_setup_entry(
@@ -26,14 +32,20 @@ async def async_setup_entry(
     entities: list[SensorEntity] = []
     for key in coordinator.data:
         namespace, kind, name = key
-        entities.append(KubernetesReadyPodsSensor(coordinator, key))
-        entities.append(KubernetesDesiredReplicasSensor(coordinator, key))
-        if kind == RESOURCE_TYPE_DEPLOYMENT:
-            entities.append(KubernetesAvailablePodsSensor(coordinator, key))
-        entities.append(KubernetesContainerImageSensor(coordinator, key))
-        entities.append(KubernetesLastRestartSensor(coordinator, key))
-        entities.append(KubernetesPodRestartCountSensor(coordinator, key))
-        entities.append(KubernetesLastRestartReasonSensor(coordinator, key))
+        if kind in (RESOURCE_TYPE_DEPLOYMENT, RESOURCE_TYPE_STATEFULSET):
+            entities.append(KubernetesReadyPodsSensor(coordinator, key))
+            entities.append(KubernetesDesiredReplicasSensor(coordinator, key))
+            if kind == RESOURCE_TYPE_DEPLOYMENT:
+                entities.append(KubernetesAvailablePodsSensor(coordinator, key))
+            entities.append(KubernetesContainerImageSensor(coordinator, key))
+            entities.append(KubernetesLastRestartSensor(coordinator, key))
+            entities.append(KubernetesPodRestartCountSensor(coordinator, key))
+            entities.append(KubernetesLastRestartReasonSensor(coordinator, key))
+
+    if entry.options.get(CONF_NODE_MONITORING, False):
+        entry_id = entry.entry_id
+        entities.append(KubernetesClusterTotalNodesSensor(coordinator, entry_id))
+        entities.append(KubernetesClusterReadyNodesSensor(coordinator, entry_id))
 
     async_add_entities(entities)
 

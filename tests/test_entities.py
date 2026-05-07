@@ -5,14 +5,17 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from homeassistant.const import STATE_OFF
+from homeassistant.const import STATE_OFF, STATE_ON
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.kubernetes.const import (
+    CONF_NODE_MONITORING,
     DOMAIN,
 )
 
 from .conftest import MOCK_CONFIG_DATA, MOCK_OPTIONS
+
+MOCK_OPTIONS_WITH_NODES = {**MOCK_OPTIONS, CONF_NODE_MONITORING: True}
 
 
 @pytest.fixture(autouse=True)
@@ -187,3 +190,56 @@ async def test_device_info_groups_entities(hass, mock_k8s_client):
     device = devices[0]
     assert device.manufacturer == "Kubernetes"
     assert device.model == "Deployment"
+
+
+@pytest.mark.asyncio
+async def test_cluster_total_nodes_sensor(hass, mock_k8s_client):
+    """Test cluster total nodes sensor reports correct value."""
+    entry = make_entry(hass, options=MOCK_OPTIONS_WITH_NODES)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.kubernetes_cluster_total_nodes")
+    assert state is not None
+    assert state.state == "2"
+
+
+@pytest.mark.asyncio
+async def test_cluster_ready_nodes_sensor(hass, mock_k8s_client):
+    """Test cluster ready nodes sensor reports correct value."""
+    entry = make_entry(hass, options=MOCK_OPTIONS_WITH_NODES)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.kubernetes_cluster_ready_nodes")
+    assert state is not None
+    assert state.state == "2"
+
+
+@pytest.mark.asyncio
+async def test_node_ready_binary_sensor(hass, mock_k8s_client):
+    """Test node ready binary sensors for each node."""
+    entry = make_entry(hass, options=MOCK_OPTIONS_WITH_NODES)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("binary_sensor.node_1_ready")
+    assert state is not None
+    assert state.state == STATE_ON
+
+    state = hass.states.get("binary_sensor.node_2_ready")
+    assert state is not None
+    assert state.state == STATE_ON
+
+
+@pytest.mark.asyncio
+async def test_no_node_entities_when_monitoring_disabled(hass, mock_k8s_client):
+    """Test no cluster/node entities are created when node monitoring disabled."""
+    entry = make_entry(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.kubernetes_cluster_total_nodes") is None
+    assert hass.states.get("sensor.kubernetes_cluster_ready_nodes") is None
+    assert hass.states.get("binary_sensor.node_1_ready") is None
+    assert hass.states.get("binary_sensor.node_2_ready") is None

@@ -48,6 +48,9 @@
     "binary_sensor": {
       "rollout_in_progress": {
         "name": "Rollout In Progress"
+      },
+      "node_ready": {
+        "name": "Ready"
       }
     },
     "sensor": {
@@ -71,6 +74,12 @@
       },
       "last_restart_reason": {
         "name": "Last Restart Reason"
+      },
+      "total_nodes": {
+        "name": "Total Nodes"
+      },
+      "ready_nodes": {
+        "name": "Ready Nodes"
       }
     },
     "button": {

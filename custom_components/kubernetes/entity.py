@@ -15,6 +15,26 @@ from .coordinator import KubernetesCoordinator, ResourceKey
 CACHED_PROPS = ("device_info", "resource_data", "available", "native_value", "is_on")
 
 
+def cluster_device_info(entry_id: str) -> DeviceInfo:
+    """Return device info for the cluster device."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_cluster")},
+        name="Kubernetes Cluster",
+        manufacturer="Kubernetes",
+        model="Cluster",
+    )
+
+
+def node_device_info(entry_id: str, node_name: str) -> DeviceInfo:
+    """Return device info for a node device."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{entry_id}_node_{node_name}")},
+        name=node_name,
+        manufacturer="Kubernetes",
+        model="Node",
+    )
+
+
 class KubernetesEntity(CoordinatorEntity[KubernetesCoordinator]):  # type: ignore[reportIncompatibleVariableOverride]
     """Base class for Kubernetes entities."""
 
