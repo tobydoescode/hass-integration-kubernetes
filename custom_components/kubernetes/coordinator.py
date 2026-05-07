@@ -9,6 +9,11 @@ from typing import Any
 import yaml
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.issue_registry import (
+    IssueSeverity,
+    async_create_issue,
+    async_delete_issue,
+)
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
@@ -52,6 +57,7 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         self._api_client = None
         self._apps_v1 = None
         self._core_v1 = None
+        self._consecutive_failures: int = 0
 
     def _ensure_client(self) -> None:
         """Create the Kubernetes API client if not already created."""
@@ -79,9 +85,36 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     async def _async_update_data(self) -> CoordinatorData:
         """Fetch data from Kubernetes."""
         try:
-            return await self.hass.async_add_executor_job(self._fetch_data)
+            data = await self.hass.async_add_executor_job(self._fetch_data)
         except Exception as err:
+            self._consecutive_failures += 1
+            self._maybe_create_repair()
             raise UpdateFailed(f"Error fetching Kubernetes data: {err}") from err
+        self._clear_repair()
+        return data
+
+    def _maybe_create_repair(self) -> None:
+        """Create a repair issue after repeated connection failures."""
+        if self._consecutive_failures < 3:
+            return
+        async_create_issue(
+            self.hass,
+            DOMAIN,
+            f"cluster_unreachable_{self.entry.entry_id}",
+            is_fixable=False,
+            severity=IssueSeverity.ERROR,
+            translation_key="cluster_unreachable",
+        )
+
+    def _clear_repair(self) -> None:
+        """Clear connection repair issue on successful communication."""
+        if self._consecutive_failures > 0:
+            self._consecutive_failures = 0
+            async_delete_issue(
+                self.hass,
+                DOMAIN,
+                f"cluster_unreachable_{self.entry.entry_id}",
+            )
 
     def _fetch_data(self) -> CoordinatorData:
         """Fetch deployments and statefulsets (sync, runs in executor)."""

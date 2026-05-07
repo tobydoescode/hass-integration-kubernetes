@@ -38,6 +38,12 @@
       }
     }
   },
+  "issues": {
+    "cluster_unreachable": {
+      "title": "Kubernetes cluster unreachable",
+      "description": "Cannot connect to the Kubernetes API server. Ensure the cluster is running and the kubeconfig is valid."
+    }
+  },
   "entity": {
     "binary_sensor": {
       "rollout_in_progress": {
