@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
@@ -9,7 +11,17 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN
 from .coordinator import KubernetesCoordinator
 
+_LOGGER = logging.getLogger(__name__)
+
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.NUMBER, Platform.SENSOR]
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate config entry to current version."""
+    _LOGGER.debug(
+        "Migrating Kubernetes config entry from %s.%s", entry.version, entry.minor_version
+    )
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
