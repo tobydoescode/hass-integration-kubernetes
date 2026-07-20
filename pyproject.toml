@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Home Assistant custom integration for Kubernetes"
 requires-python = ">=3.12"
 dependencies = [
-    "kubernetes>=35.0.0",
+    "kubernetes>=36.0.3",
 ]
 
 [project.optional-dependencies]
