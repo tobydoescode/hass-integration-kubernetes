@@ -40,6 +40,16 @@ type ResourceData = dict[str, Any]
 type CoordinatorData = dict[ResourceKey, ResourceData]
 
 
+def _list_items(response: Any) -> list[Any]:
+    """Return the items of a Kubernetes list response.
+
+    The generated client signatures cover the raw-response and async_req modes
+    too, so the declared return type is a union that has no `items`. All calls
+    here use the default (deserialized, synchronous) mode.
+    """
+    return response.items
+
+
 class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
     """Coordinator to fetch Kubernetes resource data."""
 
@@ -144,13 +154,13 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     label_selector=label_selector,
                     _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
                 )
-                self._process_deployments(deps.items, data)
+                self._process_deployments(_list_items(deps), data)
         else:
             deps = self._apps_v1.list_deployment_for_all_namespaces(
                 label_selector=label_selector,
                 _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
             )
-            self._process_deployments(deps.items, data)
+            self._process_deployments(_list_items(deps), data)
 
         # Fetch StatefulSets
         if namespaces:
@@ -160,13 +170,13 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
                     label_selector=label_selector,
                     _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
                 )
-                self._process_statefulsets(sts.items, data)
+                self._process_statefulsets(_list_items(sts), data)
         else:
             sts = self._apps_v1.list_stateful_set_for_all_namespaces(
                 label_selector=label_selector,
                 _request_timeout=KUBERNETES_REQUEST_TIMEOUT,
             )
-            self._process_statefulsets(sts.items, data)
+            self._process_statefulsets(_list_items(sts), data)
 
         # Fetch pod restart counts for each resource
         self._fetch_pod_restart_counts(data)
@@ -210,7 +220,7 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
             total_restarts = 0
             latest_reason: str | None = None
             latest_finished: datetime | None = None
-            for pod in pods.items:
+            for pod in _list_items(pods):
                 for cs in pod.status.container_statuses or []:
                     total_restarts += cs.restart_count
                     terminated = cs.last_state.terminated if cs.last_state else None
@@ -274,7 +284,7 @@ class KubernetesCoordinator(DataUpdateCoordinator[CoordinatorData]):
         )
         total_nodes = 0
         ready_nodes = 0
-        for node in node_list.items:
+        for node in _list_items(node_list):
             name: str = node.metadata.name
             ready = False
             for condition in node.status.conditions or []:
