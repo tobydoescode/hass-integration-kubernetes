@@ -1,15 +1,47 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "packageRules": [
     {
-      "matchPackageNames": ["kubernetes"],
+      "matchDepNames": [
+        "python"
+      ],
+      "description": "One PR for every Python pin, so they cannot move independently",
+      "groupName": "python",
+      "separateMinorPatch": false
+    },
+    {
+      "matchPackageNames": [
+        "kubernetes"
+      ],
       "rangeStrategy": "bump"
     },
     {
       "groupName": "dev dependencies",
-      "matchDepTypes": ["project.optional-dependencies"],
-      "matchPackagePatterns": ["pytest*", "ruff"]
+      "matchDepTypes": [
+        "project.optional-dependencies"
+      ],
+      "matchPackagePatterns": [
+        "pytest*",
+        "ruff"
+      ]
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Track requires-python, which no built-in manager updates, so it moves with .python-version instead of silently drifting behind it",
+      "managerFilePatterns": [
+        "/^pyproject\\.toml$/"
+      ],
+      "matchStrings": [
+        "requires-python\\s*=\\s*\"[^\"]*?(?<currentValue>\\d+\\.\\d+)\""
+      ],
+      "depNameTemplate": "python",
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
     }
   ]
 }
