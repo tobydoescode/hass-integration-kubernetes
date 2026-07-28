@@ -26,6 +26,10 @@ from .conftest import MOCK_KUBECONFIG
 PATCH_VALIDATE = "custom_components.kubernetes.config_flow._validate_kubeconfig"
 PATCH_TEST_CONN = "custom_components.kubernetes.config_flow._test_connection"
 PATCH_UNIQUE_ID = "custom_components.kubernetes.config_flow._cluster_unique_id"
+# Completing the flow creates the entry, which sets the integration up and
+# would have the coordinator reach for the real cluster. A config flow test
+# has no business exercising setup.
+PATCH_SETUP = "custom_components.kubernetes.async_setup_entry"
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +45,7 @@ async def test_user_step_creates_entry_on_success(hass):
         patch(PATCH_VALIDATE, return_value=(config_dict, None)),
         patch(PATCH_TEST_CONN, return_value=None),
         patch(PATCH_UNIQUE_ID, return_value="abc123"),
+        patch(PATCH_SETUP, return_value=True),
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -48,17 +53,21 @@ async def test_user_step_creates_entry_on_success(hass):
             data={CONF_KUBECONFIG: MOCK_KUBECONFIG},
         )
 
-    assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "options"
+        assert result["type"] is FlowResultType.FORM
+        assert result["step_id"] == "options"
 
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"],
-        {
-            CONF_NAMESPACES: "default",
-            CONF_LABEL_SELECTOR: DEFAULT_LABEL_SELECTOR,
-            CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
-        },
-    )
+        # Completing the flow creates the entry, which sets the integration up
+        # and would otherwise reach for the real cluster. The patches have to
+        # still be in force here, not just for the first step.
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"],
+            {
+                CONF_NAMESPACES: "default",
+                CONF_LABEL_SELECTOR: DEFAULT_LABEL_SELECTOR,
+                CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
+            },
+        )
+        await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_KUBECONFIG] == MOCK_KUBECONFIG
