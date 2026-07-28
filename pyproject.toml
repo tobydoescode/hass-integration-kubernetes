@@ -2,7 +2,7 @@
 name = "ha-kubernetes-integration"
 version = "0.1.0"
 description = "Home Assistant custom integration for Kubernetes"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "kubernetes>=35.0.0",
 ]
