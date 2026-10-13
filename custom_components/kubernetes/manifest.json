@@ -8,6 +8,6 @@
   "integration_type": "hub",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/tobydoescode/ha-integration-kubernetes/issues",
-  "requirements": ["kubernetes>=36.0.3"],
+  "requirements": ["kubernetes>=37.0.1"],
   "version": "0.1.0"
 }
